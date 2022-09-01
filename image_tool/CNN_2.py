@@ -14,7 +14,9 @@ import Simple_CNN
 import Resnet
 import original_LeNet
 
-train_data_path='../../new_Charlock_plus/'
+
+# train_data_path='../../new_Charlock_plus/'
+train_data_path='../../Charlock_3.0_allG/'
 vaid_data_path='../../Charlock_3.0_allG_v/'
 transform = transforms.Compose(
     [transforms.ToTensor(),
@@ -32,7 +34,8 @@ class load_dataset(Dataset):
             # print(filename)
             # print(image.size[0],image.size[1])
             # image = image.resize((224, 224))  # uniform image size
-            image = image.resize((32, 32))
+            # image = image.resize((32, 32))
+            image = image.resize((74, 74))
             image = self.transform(image)  # transform to tensor
             self.images.append(image)
             # print(image.size())
@@ -56,7 +59,7 @@ class load_dataset(Dataset):
                 else:
                     self.labels.append(4)  #down
                     label_num[4] = label_num[4] + 1
-            elif abs(float(file_seg[1])/float(file_seg[0]))<3 or abs(float(file_seg[0])/float(file_seg[1]))<3:
+            elif abs(float(file_seg[1])/float(file_seg[0]))<3 and abs(float(file_seg[0])/float(file_seg[1]))<3:
                 if(float(file_seg[0])>0):
                     if(float(file_seg[1])>0):
                         self.labels.append(5) #right-up
@@ -98,9 +101,15 @@ class load_dataset(Dataset):
         return self.images[index], self.labels[index]
 
     def __len__(self):  # len of the iterator
-        images = np.array(self.images)
-        len = images.shape[0]
-        return len
+        # print("len is:")
+        # print(type(self.images))
+        len_oi=len(self.images)
+        # print(len_oi)
+        # input()
+        # images = np.array(self.images)
+        # len_image = images.shape[0]
+        # print(len_image)
+        return len_oi
 
 
 class LeNet(nn.Module):
@@ -160,11 +169,11 @@ transform = transforms.Compose(
 
 train_set = load_dataset(train_data_path)
 print(len(train_set))
-# input()
+input()
 train_loader = torch.utils.data.DataLoader(train_set, batch_size=128,
                                                shuffle=True, num_workers=0)
 print(len(train_loader))
-# input()
+
 val_set = load_dataset(vaid_data_path)
 print(len(val_set))
 
@@ -172,19 +181,36 @@ val_loader = DataLoader(val_set, batch_size=90,
                         shuffle=False, num_workers=0)
 print(len(val_loader))
 
+
+# valid and train
+train_size=int(len(train_set) * 0.8)
+vaid_size = len(train_set)-train_size
+train_dataset, vaid_dataset = torch.utils.data.random_split(train_set, [train_size, vaid_size])
+train_dataset=torch.utils.data.DataLoader(train_dataset, batch_size=64,
+                                              shuffle=True, num_workers=0)
+vaid_dataset=torch.utils.data.DataLoader(vaid_dataset, batch_size=200,
+                                              shuffle=True, num_workers=0)
+#######################################
+
+
 val_data_iter = iter(val_loader) # use to iterate
 val_image, val_label = val_data_iter.next()
+
+
 # train_data_iter=iter(train_loader[:100])
 train_image, train_label = next(iter(train_loader))
-
+vaid_image, vaid_label = next(iter(vaid_dataset))
+print("size of the train data: "+str(len(vaid_image)))
 
 # net = Resnet.ResNet50()
-net = original_LeNet.LeNet()
+net = Simple_CNN.Layers_2()
+# net = original_LeNet.LeNet()
 net.to(device)  # GPU
 loss_function = nn.CrossEntropyLoss() # include softmax
 optimizer = optim.Adam(net.parameters(), lr=0.0001) #Adam optimizer
+log=open("log_tvt.txt",'w')
 
-for epoch in range(1000):  # loop over the dataset multiple times
+for epoch in range(300):  # loop over the dataset multiple times
     print("the %d time training"%(epoch))
     running_loss = 0.0
     for step, data in enumerate(train_loader, start=0):
@@ -201,7 +227,7 @@ for epoch in range(1000):  # loop over the dataset multiple times
             # GPU
         outputs = net(inputs.to(device))  # inputs sent to device
         loss = loss_function(outputs, labels.to(device))  # labels sent to device
-
+        vaid_loss = loss_function(outputs, labels.to(device))
         loss.backward() # loss backforward
         optimizer.step() # step update parameter
 
@@ -212,22 +238,30 @@ for epoch in range(1000):  # loop over the dataset multiple times
                     # outputs = net(val_image)  # [batch, 10]
                 outputs = net(val_image.to(device))  # 使用GPU时用这行将test_image分配到指定的device中
                 outputs_t=net(train_image.to(device))
+                outputs_v= net(vaid_image.to(device))
                 # print(outputs)
                 # input()
                 predict_y = torch.max(outputs, dim=1)[1] #dim=1，因为dim=0是batch；[1]是索引，最大值在哪个位置
                     # accuracy = torch.eq(predict_y, val_label).sum().item() / val_label.size(0)
                     # eq用来比较，如果预测正确返回1，错误返回0 -> 得到的是tensor，要用item转成数值 CPU时使用
                 predict_t_y = torch.max(outputs_t, dim=1)[1]
+                predict_v_y = torch.max(outputs_v, dim=1)[1]
+
+
                 accuracy = (predict_y==val_label.to(device)).sum().item() / val_label.size(0)
+                accuracy_vaid= (predict_v_y==vaid_label.to(device)).sum().item() / vaid_label.size(0)
                 accuracy_train = (predict_t_y==train_label.to(device)).sum().item() / train_label.size(0)
 
-                print('[%d, %5d] train_loss: %.3f  test_accuracy: %.3f  train_accuracy: %.3f' %
-                          (epoch + 1, step + 1, running_loss / 500, accuracy,accuracy_train))
+                print('[%d, %5d] train_loss: %.3f  test_accuracy: %.3f  train_accuracy: %.3f  vaid_accuracy: %.3f' %
+                          (epoch + 1, step + 1, running_loss / 500, accuracy,accuracy_train,accuracy_vaid))
+                log.write('['+str(epoch+1)+','+str(step+1)+'] train_loss:'+str(running_loss/500)+'  test_accuracy:'+str(accuracy)+'  train_accuracy:'+str(accuracy_train)+' vaid_accuracy:'+str(accuracy_vaid)+'\n')
                 running_loss = 0.0
 
 print('Finished Training')
+log.write('Finished Training')
+log.close()
 
-save_path = './Lenet.pth'
+save_path = './test_Lenet.pth'
 torch.save(net.state_dict(), save_path)
 
 # output = model(input1)

@@ -1,5 +1,6 @@
 import random
-
+import os
+from PIL import Image
 import matplotlib.pyplot as plt
 import cv2
 import numpy
@@ -35,11 +36,69 @@ def random_seg_image(img,seg_num):
         cv2.circle(image_re, (r_centerx, r_centery), 2, (0, 140, 255), -1)
         plt.imshow(image_re)
         plt.show()
+def draw_range(seg_num,img_num):
+    img=cv2.imread('../89.png')
+    draw_switch=0
+    m=seg_num
+    h, w = img.shape[0], img.shape[1]
+    grid_h = int(h * 1.0 / (m - 1) + 0.5)
+    grid_w = int(w * 1.0 / (m - 1) + 0.5)
+    h = grid_h * m
+    w = grid_w * m
+
+    image_re = cv2.resize(img, (h, w), cv2.INTER_LINEAR)
+    print(image_re.dtype)
+    gx, gy = numpy.meshgrid(numpy.linspace(0, w, m + 1), numpy.linspace(0, h, m + 1))
+    gx = gx.astype(int)
+    gy = gy.astype(int)
+    boarder_img = cv2.rectangle(image_re, (int(grid_w / 2), int(grid_h / 2)),
+                                (w - int(grid_w / 2),h - int(grid_h / 2)), (255, 0, 0), 3)
+    cv2.imwrite("boader.png",boarder_img)
+    cv2.imshow("11",boarder_img)
+    cv2.waitKey(0)
 
 
-m=4
-img=cv2.imread(r"../../new_Charlock/0.0_1.0_110.png")
-print(img.shape)
+def split_imag():
+# 读取图片
+    im = Image.open('../PP.png')
+
+# 宽高各除 3，获取裁剪后的单张图片大小
+    width = im.size[0]//3
+    height = im.size[1]//3
+
+# 裁剪图片的左上角坐标
+    start_x = 0
+    start_y = 0
+
+# 用于给图片命名
+    im_name = 1
+
+# 循环裁剪图片
+    for i in range(3):
+        for j in range(3):
+        # 裁剪图片并保存
+            crop = im.crop((start_x, start_y, start_x+width, start_y+height))
+        # 判断文件夹是否存在
+        #     if not os.path.exists('imgs'):
+                # os.mkdir('imgs')
+            # crop.save('imgs/' + str(im_name) + '.jpg')
+            plt.subplot(3,3,i*3+j+1)
+            plt.imshow(crop)
+            plt.axis('off')
+
+        # 将左上角坐标的 x 轴向右移动
+            start_x += width
+            im_name += 1
+
+    # 当第一行裁剪完后 x 继续从 0 开始裁剪
+        start_x = 0
+    # 裁剪第二行
+        start_y += height
+    plt.show()
+draw_range(6,1)
+# m=4
+# img=cv2.imread(r"../../new_Charlock/0.0_1.0_110.png")
+# print(img.shape)
 # random_seg_image(img,8)
 # print(img.shape)
 # h,w=img.shape[0],img.shape[1]

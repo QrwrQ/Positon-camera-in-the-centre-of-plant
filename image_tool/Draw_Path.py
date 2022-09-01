@@ -2,6 +2,8 @@ import torch
 import cv2
 import os
 import random
+import math
+import matplotlib.pyplot as plt
 # import CNN_2
 from torch.utils.data import DataLoader, Dataset
 import torchvision.transforms as transforms
@@ -14,8 +16,8 @@ import torch.nn.functional as F
 import torchvision
 import torch.optim as optim
 import torchvision.transforms as transforms
-
-
+import original_LeNet
+import division
 class LeNet(nn.Module):
     def __init__(self):
         super(LeNet,self).__init__()
@@ -137,7 +139,8 @@ class load_dataset(Dataset):
 def predict_img(image):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model_path = "./Lenet.pth"
-    model = LeNet()
+    # model = LeNet()
+    model = original_LeNet.LeNet()
     model.load_state_dict(torch.load(model_path))
     model.eval()
     transform = transforms.Compose([transforms.ToTensor(),
@@ -146,8 +149,8 @@ def predict_img(image):
     image = image.to(device)
     output = model(image)
     predict_value = torch.max(output, dim=1)[1]
-    print("prediction")
-    print(predict_value)
+    print("prediction1")
+    print("prediction_value:"+str(predict_value))
     predict_value=np.array(predict_value)
     return predict_value[0]
 
@@ -172,29 +175,48 @@ def class_2_vector(class_num):
     if class_num==8:
         vector=[-1,-1]
     return vector
-
+def distance_change(start_position,end_position,centre_positin):
+    distanc_start=math.sqrt(math.pow(start_position[0]-centre_positin[0],2)+math.pow(start_position[1]-centre_positin[1],2))
+    distanc_end=math.sqrt(math.pow(end_position[0]-centre_positin[0],2)+math.pow(end_position[1]-centre_positin[1],2))
+    distance_res = distanc_start-distanc_end
+    return distance_res
 def simulate_camera(image_path):
+    show_switch=0
     image_cv=cv2.imread(image_path)
+
     image_cv=cv2.resize(image_cv, (224, 224), cv2.INTER_LINEAR)
+    cv2.imwrite('temp.png', image_cv)
+    capture_from_image=cv2.imread('temp.png')
+    capture_from_image=cv2.resize(capture_from_image, (224, 224), cv2.INTER_LINEAR)
     m=8
-    step_size=6
+    step_size=3
+    if(show_switch==1):
+        cv2.namedWindow('dvide_image', cv2.WINDOW_NORMAL)
+        cv2.namedWindow('original_image', cv2.WINDOW_NORMAL)
     h, w = image_cv.shape[0], image_cv.shape[1]
     grid_h = int(h * 1.0 / (m - 1) + 0.5)
     grid_w = int(w * 1.0 / (m - 1) + 0.5)
     h = grid_h * m
     w = grid_w * m
     image_cv = cv2.resize(image_cv, (h, w), cv2.INTER_LINEAR)
+    capture_from_image=cv2.resize(capture_from_image, (h, w), cv2.INTER_LINEAR)
     border_left=int(grid_h / 2 + 0.5)
     border_right=int(h - grid_h / 2)
     border_up=int(w - grid_w / 2)
     border_down=int(grid_w / 2 + 0.5)
     r_centery = random.randint(int(grid_w / 2 + 0.5), int(w - grid_w / 2))  # the random picture centre point
     r_centerx = random.randint(int(grid_h / 2 + 0.5), int(h - grid_h / 2))
+    start_position=[r_centerx,r_centery]
     cv2.drawMarker(image_cv, (r_centerx, r_centery), (0,255,0), markerType=2, markerSize=5)
-    camera_caught_img = image_cv[r_centery - int(grid_w / 2):r_centery + int(grid_w / 2),
+    camera_caught_img = capture_from_image[r_centery - int(grid_w / 2):r_centery + int(grid_w / 2),
                  r_centerx - int(grid_h / 2):r_centerx + int(grid_h / 2), :]
     print(r_centerx,r_centery)
+    if(show_switch==1):
+        cv2.imshow('dvide_image',camera_caught_img)
+        cv2.imshow('original_image',image_cv)
+        cv2.waitKey(10)
     camera_caught_img=cv2.resize(camera_caught_img, (32, 32), cv2.INTER_LINEAR)
+
     print(camera_caught_img.shape)
     camera_caught_img=cv2.cvtColor(camera_caught_img,cv2.COLOR_RGB2BGR)
     # print(camera_caught_img)
@@ -206,10 +228,10 @@ def simulate_camera(image_path):
     move_centery=r_centery-(move_vector[1]*5*3)
     move_centerx=r_centerx+move_vector[0]*5*3
     if(move_centerx>border_right or move_centerx<border_left or move_centery>border_up or move_centery<border_down):
-        move_centery = r_centery + (move_vector[1] * 5 * 3)
-        move_centerx = r_centerx - move_vector[0] * 5 * 3
+        move_centery = r_centery + (move_vector[1] * 5 * 1)
+        move_centerx = r_centerx - move_vector[0] * 5 * 1
 
-    print(move_centerx,move_centery)
+    # print(move_centerx,move_centery)
     cv2.arrowedLine(image_cv,pt1=(r_centerx,r_centery), pt2=(move_centerx, move_centery), color=(255, 255, 0), thickness=1,
                     line_type=cv2.LINE_8, shift=0, tipLength=0.05)
     # cv2.arrowedLine(image_cv, pt1=(0, 0), pt2=(100, 100), color=(255, 255, 0),
@@ -217,17 +239,23 @@ def simulate_camera(image_path):
     #                 line_type=cv2.LINE_8, shift=0, tipLength=0.05)
     walk_time=0
 
-    while(picture_class!=0 and walk_time<100):
+    while(picture_class!=0 and walk_time<8):
         r_centerx=move_centerx
         r_centery=move_centery
 
-        camera_caught_img = image_cv[r_centery - int(grid_w / 2):r_centery + int(grid_w / 2),
+        camera_caught_img = capture_from_image[r_centery - int(grid_w / 2):r_centery + int(grid_w / 2),
                             r_centerx - int(grid_h / 2):r_centerx + int(grid_h / 2), :]
-        camera_caught_img = cv2.resize(camera_caught_img, (74, 74), cv2.INTER_LINEAR)
-        camera_caught_img = cv2.cvtColor(camera_caught_img, cv2.COLOR_RGB2BGR)
-        camera_caught_img = Image.fromarray(camera_caught_img)
-        picture_class = predict_img(camera_caught_img)
-        move_vector = class_2_vector(picture_class)
+        if(show_switch==1):
+            cv2.imshow('dvide_image', camera_caught_img)
+            cv2.imshow('original_image',image_cv)
+            cv2.waitKey(10)
+        camera_caught_img = cv2.resize(camera_caught_img, (32, 32), cv2.INTER_LINEAR)
+        green_area = division.green_division(camera_caught_img)
+        if(green_area>20 and green_area<1000):
+            camera_caught_img = cv2.cvtColor(camera_caught_img, cv2.COLOR_RGB2BGR)
+            camera_caught_img = Image.fromarray(camera_caught_img)
+            picture_class = predict_img(camera_caught_img)
+            move_vector = class_2_vector(picture_class)
         move_centery = r_centery - (move_vector[1] * 5 *step_size)
         move_centerx = r_centerx + move_vector[0] * 5 *step_size
         if (move_centerx > border_right or move_centerx < border_left or move_centery > border_up or move_centery < border_down):
@@ -237,17 +265,30 @@ def simulate_camera(image_path):
                         thickness=1,
                         line_type=cv2.LINE_8, shift=0, tipLength=0.05)
         walk_time=walk_time+1
+    end_position=[move_centerx,move_centery]
 
-    cv2.drawMarker(image_cv, (move_centerx, move_centery), (0, 0, 255), markerType=3, markerSize=5)
-    print(walk_time)
+    cv2.drawMarker(image_cv, (move_centerx, move_centery), (255, 0, 0), markerType=3, markerSize=5)
+    distance_gap=distance_change(start_position,end_position,[int(w/2),int(h/2)])
+    print("walk time"+str(walk_time))
+    print(image_path.split('/')[3])
+    cv2.imwrite("../../camera_path/"+image_path.split('/')[3],image_cv)
     image_cv = cv2.resize(image_cv, (224*3, 224*3), cv2.INTER_LINEAR)
     print(image_cv.shape)
+    # cv2.imshow("track",image_cv)
+    os.remove('temp.png')
+    cv2.destroyAllWindows()
+    return distance_gap
 
-
-    cv2.imshow("track",image_cv)
-    cv2.waitKey(0)
-
-
+def distance_show(path):
+    file_list = os.listdir(path)
+    all_distance=[]
+    for file in file_list:
+        all_distance.append(simulate_camera(path+file))
+    plt.plot(all_distance, label='distance')
+    plt.xlabel('number')
+    plt.ylabel('distance')
+    plt.legend(loc='best')
+    plt.show()
 if __name__=="__main__":
     # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     # model_path="./Lenet.pth"
@@ -294,5 +335,5 @@ if __name__=="__main__":
     # predict_value=predict_value.numpy()
     # print(predict_value[0])
     # vector=[]
-    simulate_camera("../../Charlock/1.png")
-
+    # simulate_camera("89.png")
+    distance_show('../../CharlocK_2/')

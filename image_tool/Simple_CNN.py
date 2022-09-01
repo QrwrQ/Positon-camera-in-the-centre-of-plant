@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from PIL import Image
 import os
+#size= 74
 
 class Layers_2(nn.Module):
     def __init__(self):

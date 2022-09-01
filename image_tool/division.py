@@ -337,6 +337,6 @@ def remove_nogreen(path):
 # cut_file("../../Charlock_3.0_allG/","../../Charlock_3.0_allG_v/")
 # remove_nogreen("../../new_Charlock_plus/")
 
-for i in range(11):
-    # create_dataset()
-    add_data(i+20)
+# for i in range(11):
+#     # create_dataset()
+#     add_data(i+20)
